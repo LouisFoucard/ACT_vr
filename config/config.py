@@ -17,8 +17,7 @@ os.environ['DEVICE'] = device
 
 # robot port names
 ROBOT_PORTS = {
-    'leader': '/dev/tty.usbmodem57380045221',
-    'follower': '/dev/tty.usbmodem57380046991'
+    'follower': '/dev/ttyACM0'
 }
 
 
@@ -50,7 +49,7 @@ POLICY_CONFIG = {
     'nheads': 8,
     'camera_names': ['front'],
     'policy_class': 'ACT',
-    'temporal_agg': False
+    'temporal_agg': True
 }
 
 # training config

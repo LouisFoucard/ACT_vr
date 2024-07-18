@@ -5,7 +5,9 @@ import h5py
 import argparse
 from tqdm import tqdm
 from time import sleep, time
+from vr_controller import VRController
 from training.utils import pwm2pos, pwm2vel
+import threading
 
 from robot import Robot
 
@@ -19,6 +21,13 @@ num_episodes = args.num_episodes
 
 cfg = TASK_CONFIG
 
+# Variable to control the loop
+wait_for_input = True
+
+def wait_for_enter():
+    global wait_for_input
+    input("Press Enter to start recodring...\n")
+    wait_for_input = False
 
 def capture_image(cam):
     # Capture a single frame
@@ -26,10 +35,10 @@ def capture_image(cam):
     # Generate a unique filename with the current date and time
     image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     # Define your crop coordinates (top left corner and bottom right corner)
-    x1, y1 = 400, 0  # Example starting coordinates (top left of the crop rectangle)
-    x2, y2 = 1600, 900  # Example ending coordinates (bottom right of the crop rectangle)
-    # Crop the image
-    image = image[y1:y2, x1:x2]
+    # x1, y1 = 0, 0  # Example starting coordinates (top left of the crop rectangle)
+    # x2, y2 = 480, 640  # Example ending coordinates (bottom right of the crop rectangle)
+    # # Crop the image
+    # image = image[y1:y2, x1:x2]
     # Resize the image
     image = cv2.resize(image, (cfg['cam_width'], cfg['cam_height']), interpolation=cv2.INTER_AREA)
 
@@ -45,20 +54,29 @@ if __name__ == "__main__":
     # init follower
     follower = Robot(device_name=ROBOT_PORTS['follower'])
     # init leader
-    leader = Robot(device_name=ROBOT_PORTS['leader'])
-    leader.set_trigger_torque()
+    leader = VRController()
+    leader.start()
 
-    
-    for i in range(num_episodes):
+    # Start the background thread
+        
+    for e in range(num_episodes):
         # bring the follower to the leader and start camera
-        for i in range(200):
+        print("warm up")
+        # wait for user input to start the episode (user can control the arm in the meantime)
+        
+        wait_for_input = True
+        thread = threading.Thread(target=wait_for_enter)
+        thread.start()
+        while wait_for_input:
             follower.set_goal_pos(leader.read_position())
             _ = capture_image(cam)
-        os.system('say "go"')
+        thread.join()
+        print("GO")
         # init buffers
         obs_replay = []
         action_replay = []
-        for i in tqdm(range(cfg['episode_len'])):
+        print("Recording episode {}".format(e+11))
+        for t in tqdm(range(cfg['episode_len'])):
             # observation
             qpos = follower.read_position()
             qvel = follower.read_velocity()
@@ -77,8 +95,7 @@ if __name__ == "__main__":
             obs_replay.append(obs)
             action_replay.append(action)
 
-        os.system('say "stop"')
-
+        print("STOP")
         # disable torque
         #leader._disable_torque()
         #follower._disable_torque()
@@ -126,5 +143,3 @@ if __name__ == "__main__":
             for name, array in data_dict.items():
                 root[name][...] = array
     
-    leader._disable_torque()
-    follower._disable_torque()

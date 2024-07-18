@@ -1,9 +1,10 @@
-import mujoco
 import numpy as np
-from typing import Union
-from enum import Enum, auto
 from dynamixel import Dynamixel, OperatingMode, ReadAttribute
+import time
 from dynamixel_sdk import GroupSyncRead, GroupSyncWrite, DXL_LOBYTE, DXL_HIBYTE, DXL_LOWORD, DXL_HIWORD
+from enum import Enum, auto
+from typing import Union
+
 
 class MotorControlType(Enum):
     PWM = auto()

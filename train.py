@@ -10,7 +10,7 @@ from training.utils import *
 
 # parse the task name via command line
 parser = argparse.ArgumentParser()
-parser.add_argument('--task', type=str, default='task1')
+parser.add_argument('--task', type=str, default='basic')
 args = parser.parse_args()
 task = args.task
 

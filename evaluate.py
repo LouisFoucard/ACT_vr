@@ -13,7 +13,7 @@ from training.utils import *
 
 # parse the task name via command line
 parser = argparse.ArgumentParser()
-parser.add_argument('--task', type=str, default='task1')
+parser.add_argument('--task', type=str, default='basic')
 args = parser.parse_args()
 task = args.task
 
@@ -30,10 +30,10 @@ def capture_image(cam):
     # Generate a unique filename with the current date and time
     image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     # Define your crop coordinates (top left corner and bottom right corner)
-    x1, y1 = 400, 0  # Example starting coordinates (top left of the crop rectangle)
-    x2, y2 = 1600, 900  # Example ending coordinates (bottom right of the crop rectangle)
-    # Crop the image
-    image = image[y1:y2, x1:x2]
+    # x1, y1 = 400, 0  # Example starting coordinates (top left of the crop rectangle)
+    # x2, y2 = 1600, 900  # Example ending coordinates (bottom right of the crop rectangle)
+    # # Crop the image
+    # image = image[y1:y2, x1:x2]
     # Resize the image
     image = cv2.resize(image, (cfg['cam_width'], cfg['cam_height']), interpolation=cv2.INTER_AREA)
 
@@ -49,7 +49,7 @@ if __name__ == "__main__":
     follower = Robot(device_name=ROBOT_PORTS['follower'])
 
     # load the policy
-    ckpt_path = os.path.join(train_cfg['checkpoint_dir'], train_cfg['eval_ckpt_name'])
+    ckpt_path = os.path.join(train_cfg['checkpoint_dir'], task, train_cfg['eval_ckpt_name'])
     policy = make_policy(policy_config['policy_class'], policy_config)
     loading_status = policy.load_state_dict(torch.load(ckpt_path, map_location=torch.device(device)))
     print(loading_status)
@@ -57,7 +57,7 @@ if __name__ == "__main__":
     policy.eval()
 
     print(f'Loaded: {ckpt_path}')
-    stats_path = os.path.join(train_cfg['checkpoint_dir'], f'dataset_stats.pkl')
+    stats_path = os.path.join(train_cfg['checkpoint_dir'], task, f'dataset_stats.pkl')
     with open(stats_path, 'rb') as f:
         stats = pickle.load(f)
 
@@ -69,20 +69,21 @@ if __name__ == "__main__":
         query_frequency = 1
         num_queries = policy_config['num_queries']
 
-    # bring the follower to the leader
-    for i in range(90):
-        follower.read_position()
-        _ = capture_image(cam)
-    
-    obs = {
-        'qpos': pwm2pos(follower.read_position()),
-        'qvel': vel2pwm(follower.read_velocity()),
-        'images': {cn: capture_image(cam) for cn in cfg['camera_names']}
-    }
-    os.system('say "start"')
 
-    n_rollouts = 1
+
+    n_rollouts = 100
     for i in range(n_rollouts):
+        print("start")
+        # bring the follower to the leader
+        for i in range(10):
+            follower.read_position()
+            _ = capture_image(cam)
+        
+        obs = {
+            'qpos': pwm2pos(follower.read_position()),
+            'qvel': vel2pwm(follower.read_velocity()),
+            'images': {cn: capture_image(cam) for cn in cfg['camera_names']}
+        }
         ### evaluation loop
         if policy_config['temporal_agg']:
             all_time_actions = torch.zeros([cfg['episode_len'], cfg['episode_len']+num_queries, cfg['state_dim']]).to(device)
@@ -130,7 +131,7 @@ if __name__ == "__main__":
                 obs_replay.append(obs)
                 action_replay.append(action)
 
-        os.system('say "stop"')
+            print("stop")
 
         # create a dictionary to store the data
         data_dict = {
@@ -160,7 +161,7 @@ if __name__ == "__main__":
         idx = len([name for name in os.listdir(data_dir) if os.path.isfile(os.path.join(data_dir, name))])
         dataset_path = os.path.join(data_dir, f'episode_{idx}')
         # save the data
-        with h5py.File("data/demo/trained.hdf5", 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
+        with h5py.File(os.path.join(train_cfg['checkpoint_dir'], task, "trained.hdf5"), 'w', rdcc_nbytes=1024 ** 2 * 2) as root:
             root.attrs['sim'] = True
             obs = root.create_group('observations')
             image = obs.create_group('images')
